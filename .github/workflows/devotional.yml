@@ -1,0 +1,48 @@
+name: Daily Devotional
+
+on:
+  schedule:
+    # Every 30 min across the EAT morning window (UTC; EAT = UTC+3).
+    # 21:00-06:59 UTC == 00:00-09:59 EAT.
+    - cron: "*/30 0-6,21-23 * * *"
+  workflow_dispatch: {}
+
+# Prevent overlapping runs from racing on the state commit.
+concurrency:
+  group: daily-devotional
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python -m phaneroo_bot.main
+
+      - name: Commit updated state
+        run: |
+          if [[ -n "$(git status --porcelain state.json)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+            git add state.json
+            git commit -m "chore: update devotional state [skip ci]"
+            git push
+          else
+            echo "No state change."
+          fi
