@@ -18,12 +18,20 @@ Findings from probing `https://phaneroo.org`:
   (`/devotion/feed/` is empty), and is **absent from the sitemap**
   (`wp-sitemap.xml` lists post/page/product/sermons/events only). Regular `posts` in the
   REST API are stale (latest is 2022), so they are not a usable source.
-- **The reliable source is the listing page** `https://phaneroo.org/daily-devotion/`.
-  It renders devotionals **newest-first** as `https://phaneroo.org/devotion/<slug>/`
-  links. The **first such link is the most recently published devotional.**
-- **No reliable publish timestamp** is exposed on listing or detail pages, so "is this
-  today's?" cannot be derived from a date. Detection must be **state-based**: remember
-  the last slug sent; act only when a new slug appears at the top.
+- **The source is the listing page** `https://phaneroo.org/daily-devotion/`, which renders
+  devotionals **newest-first** as `https://phaneroo.org/devotion/<slug>/` links; the
+  **first link is the most recently published devotional.** **Critical caveat:** this page
+  is served from a WordPress page cache (`wpo-cache-status: cached`) that can be a full day
+  stale — so the cached copy may show *yesterday's* as the top link and omit today's
+  entirely. **Fix:** fetch with a unique cache-busting query param
+  (`?nocache=<unix_ts>`), which returns fresh HTML where today's devotional is correctly
+  first. The homepage (`https://phaneroo.org/`) also lists the newest devotional first and
+  is used as a fallback.
+- **The oEmbed `thumbnail_url` filename encodes the date** (e.g. `01-June-2026_Web.png` →
+  `2026-06-01`). This gives a reliable publish date used to (a) display the date and
+  (b) guard against ever sending a devotional dated older than the last one sent.
+- Detection is **state-based**: remember the last slug + date sent; send only when a new
+  slug appears AND its date is not older than the last sent.
 - The detail page (`/devotion/<slug>/`) contains the full title and body as **Elementor
   HTML**. `og:image` is present for the featured image. The `<title>` tag is
   `"<Title> – Phaneroo"`. The WordPress **oEmbed endpoint**
@@ -50,7 +58,7 @@ Small, independently testable modules under a `phaneroo_bot/` package:
 | Module | Responsibility | Depends on |
 |---|---|---|
 | `fetcher.py` | HTTP GET with timeout, retries, and a real User-Agent. Returns response text/bytes. | `requests` |
-| `discover.py` | Parse `/daily-devotion/` → `(latest_slug, latest_url)`. | `fetcher` |
+| `discover.py` | Cache-busted fetch of `/daily-devotion/` (homepage fallback) → `(latest_slug, latest_url)`. | `fetcher` |
 | `parser.py` | Parse a `/devotion/<slug>/` page → `Devotional{title, scripture, paragraphs[], image_url, url}`. | `fetcher` |
 | `telegram.py` | `send_photo`, `send_message`, message chunking, HTML formatting/escaping. | `requests` |
 | `state.py` | Read/write `state.json` (`{last_slug, last_sent_at}`); detect bootstrap (empty state). | stdlib |
@@ -63,10 +71,13 @@ Small, independently testable modules under a `phaneroo_bot/` package:
 class Devotional:
     slug: str
     url: str
-    title: str
-    scripture: str | None     # optional; best-effort extraction
-    paragraphs: list[str]      # body, in order
-    image_url: str | None      # featured image (og:image), optional
+    title: str                 # HTML entities decoded
+    author: str | None         # byline, e.g. "Apostle Grace Lubega"
+    scripture: str | None      # optional; best-effort extraction
+    body: list[str]            # body paragraphs, in order
+    image_url: str | None      # featured image (oEmbed thumbnail), optional
+    date: str | None           # display, e.g. "1 June 2026"
+    date_iso: str | None       # sortable, e.g. "2026-06-01"
 ```
 
 ## 5. Run flow (`main.py`)

@@ -7,10 +7,14 @@ Runs on free GitHub Actions — no server required.
 ## How it works
 
 A scheduled workflow runs every 30 minutes across the morning window (00:00–09:00 EAT).
-It reads the latest devotional slug from `https://phaneroo.org/daily-devotion/`, compares
-it to `state.json`, and — only when a new one appears — fetches the devotional (title +
-featured image via the WordPress oEmbed API; English body scraped from the page) and
-sends it to Telegram. The new slug is committed back to `state.json` so later runs no-op.
+It reads the latest devotional slug from `https://phaneroo.org/daily-devotion/` — fetched
+with a **cache-busting query param** because that page is served from a WordPress cache
+that can be a day stale (homepage used as fallback) — compares it to `state.json`, and,
+only when a genuinely new one appears, fetches the devotional (title + featured image +
+date via the WordPress oEmbed API; English body scraped from the page) and sends it to
+Telegram. The devotional's date (parsed from the oEmbed image filename) guards against
+ever sending an older-dated entry. The new slug + date are committed back to `state.json`
+so later runs no-op.
 
 ## Setup
 
