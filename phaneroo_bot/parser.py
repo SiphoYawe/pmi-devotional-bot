@@ -1,6 +1,8 @@
-"""Parse a devotional: clean title+image from oEmbed, English body from the page."""
+"""Parse a devotional: clean title+image+date from oEmbed, English body from the page."""
 import re
 from dataclasses import dataclass, field
+from datetime import date
+from html import unescape
 from urllib.parse import quote
 from bs4 import BeautifulSoup
 from phaneroo_bot import fetcher
@@ -13,6 +15,17 @@ _SCRIPTURE_RE = re.compile(r"\b\d+:\d+\b")
 _AUTHOR_RE = re.compile(r"^(Apostle|Pastor|Rev|Reverend|Ps|Bishop|Dr|Evangelist)\b")
 _SEPARATORS = {"", "—", "–", "-", "."}
 
+# Devotional thumbnails are named like "01-June-2026_Web.png" / "21_May_2026_Web.jpg".
+_IMG_DATE_RE = re.compile(r"(\d{1,2})[-_]([A-Za-z]+)[-_](\d{4})")
+_MONTHS = {
+    m.lower(): i
+    for i, m in enumerate(
+        ["January", "February", "March", "April", "May", "June",
+         "July", "August", "September", "October", "November", "December"],
+        start=1,
+    )
+}
+
 
 @dataclass
 class Devotional:
@@ -23,11 +36,31 @@ class Devotional:
     scripture: str | None = None
     body: list[str] = field(default_factory=list)
     image_url: str | None = None
+    date: str | None = None       # display, e.g. "1 June 2026"
+    date_iso: str | None = None   # sortable, e.g. "2026-06-01"
+
+
+def date_from_image_url(image_url: str | None) -> tuple[str | None, str | None]:
+    """Return (display, iso) parsed from the dated thumbnail filename, or (None, None)."""
+    if not image_url:
+        return None, None
+    m = _IMG_DATE_RE.search(image_url)
+    if not m:
+        return None, None
+    day, month_name, year = m.group(1), m.group(2).lower(), m.group(3)
+    month = _MONTHS.get(month_name)
+    if month is None:
+        return None, None
+    try:
+        d = date(int(year), month, int(day))
+    except ValueError:
+        return None, None
+    return f"{d.day} {month_name.title()} {d.year}", d.isoformat()
 
 
 def extract_metadata(oembed_json: dict) -> tuple[str, str | None]:
-    """Return (title, image_url) from the oEmbed JSON."""
-    title = (oembed_json.get("title") or "").strip()
+    """Return (title, image_url) from the oEmbed JSON (HTML entities decoded)."""
+    title = unescape((oembed_json.get("title") or "").strip())
     image_url = oembed_json.get("thumbnail_url") or None
     return title, image_url
 
@@ -72,6 +105,7 @@ def parse_devotional(
 ) -> Devotional:
     oembed = fetch_json(f"{OEMBED_URL}?url={quote(url, safe='')}&format=json")
     title, image_url = extract_metadata(oembed)
+    display_date, iso_date = date_from_image_url(image_url)
     author, scripture, body = extract_body(fetch_text(url))
     return Devotional(
         slug=slug,
@@ -81,4 +115,6 @@ def parse_devotional(
         scripture=scripture,
         body=body,
         image_url=image_url,
+        date=display_date,
+        date_iso=iso_date,
     )

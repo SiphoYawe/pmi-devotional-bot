@@ -31,10 +31,11 @@ def test_build_messages_structure():
         slug="s", url="https://phaneroo.org/devotion/s/", title="My <Title>",
         author="Apostle Grace Lubega", scripture="John 3:16 (NKJV): For God...",
         body=["First para.", "GOLDEN NUGGET: x", "PRAYER: y"],
-        image_url="https://img.test/x.png",
+        image_url="https://img.test/x.png", date="1 June 2026", date_iso="2026-06-01",
     )
     caption, body_chunks, link = telegram.build_messages(dev)
     assert "<b>My &lt;Title&gt;</b>" in caption           # title escaped + bold
+    assert "1 June 2026" in caption                        # date shown
     assert "Apostle Grace Lubega" in caption
     assert "<b>John 3:16" in body_chunks[0]                 # scripture bold, first
     assert "First para." in "".join(body_chunks)

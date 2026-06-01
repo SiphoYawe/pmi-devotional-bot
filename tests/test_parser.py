@@ -19,6 +19,32 @@ def test_extract_metadata_missing_thumbnail():
     assert image_url is None
 
 
+def test_extract_metadata_decodes_html_entities():
+    title, _ = parser.extract_metadata({"title": "The Believer&#8217;s Authority"})
+    assert title == "The Believer’s Authority"
+
+
+def test_date_from_image_url_hyphen_format():
+    display, iso = parser.date_from_image_url(
+        "https://phaneroo.org/wp-content/uploads/2026/06/01-June-2026_Web.png"
+    )
+    assert display == "1 June 2026"
+    assert iso == "2026-06-01"
+
+
+def test_date_from_image_url_underscore_format():
+    display, iso = parser.date_from_image_url(
+        "https://phaneroo.org/wp-content/uploads/2026/05/21_May_2026_Web.jpg"
+    )
+    assert display == "21 May 2026"
+    assert iso == "2026-05-21"
+
+
+def test_date_from_image_url_unparseable_is_none():
+    assert parser.date_from_image_url("https://x/logo.png") == (None, None)
+    assert parser.date_from_image_url(None) == (None, None)
+
+
 def test_extract_body_from_fixture(fixture_text):
     html = fixture_text("devotion_sample.html")
     author, scripture, body = parser.extract_body(html)
@@ -49,3 +75,6 @@ def test_parse_devotional_assembles_everything(fixture_text):
     assert len(dev.body) >= 3
     assert dev.image_url.endswith(".png")
     assert dev.url == "https://phaneroo.org/devotion/the-hidden-manna/"
+    # date parsed from the thumbnail (31-May-2026_Web.png)
+    assert dev.date == "31 May 2026"
+    assert dev.date_iso == "2026-05-31"

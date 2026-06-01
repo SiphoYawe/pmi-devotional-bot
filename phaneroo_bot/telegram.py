@@ -37,6 +37,8 @@ def chunk_text(text: str, limit: int = SAFE_CHUNK) -> list[str]:
 def build_messages(dev) -> tuple[str, list[str], str]:
     """Return (photo_caption, body_chunks, link_message), all HTML-formatted."""
     caption = f"<b>{escape_html(dev.title)}</b>"
+    if dev.date:
+        caption += f"\n📅 {escape_html(dev.date)}"
     if dev.author:
         caption += f"\n<i>{escape_html(dev.author)}</i>"
 

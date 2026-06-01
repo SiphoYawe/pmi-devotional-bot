@@ -1,4 +1,4 @@
-"""Entry point: discover -> compare -> parse -> send -> persist."""
+"""Entry point: discover -> compare -> parse -> (date guard) -> send -> persist."""
 import os
 import sys
 from pathlib import Path
@@ -7,13 +7,18 @@ from phaneroo_bot import discover, parser, telegram, state
 
 
 def run(*, state_path: Path = state.DEFAULT_PATH, token: str, chat_id: str) -> str:
-    last_slug = state.load_last_slug(state_path)
+    st = state.load_state(state_path)
+    last_slug = st.get("last_slug")
+    last_date = st.get("last_date")
+
     slug, url = discover.discover()
 
-    if last_slug is None:
-        # First run: record the current top so we never send yesterday's.
-        state.save_last_slug(state_path, slug)
-        print(f"bootstrapped: recorded '{slug}' without sending")
+    if not last_slug:
+        # First run: record the current top (with its date) without sending,
+        # so we never deliver yesterday's devotional on initial deploy.
+        dev = parser.parse_devotional(slug, url)
+        state.save_state(state_path, slug=slug, date_iso=dev.date_iso)
+        print(f"bootstrapped: recorded '{slug}' ({dev.date_iso}) without sending")
         return "bootstrapped"
 
     if slug == last_slug:
@@ -21,9 +26,16 @@ def run(*, state_path: Path = state.DEFAULT_PATH, token: str, chat_id: str) -> s
         return "noop"
 
     dev = parser.parse_devotional(slug, url)
+
+    # Accuracy guard: never send a devotional dated older than the last one sent
+    # (protects against a stale/cached response slipping an old entry to the top).
+    if dev.date_iso and last_date and dev.date_iso < last_date:
+        print(f"skip: '{slug}' dated {dev.date_iso} is older than last sent {last_date}")
+        return "noop"
+
     telegram.send_devotional(dev, token=token, chat_id=chat_id)
-    state.save_last_slug(state_path, slug)  # only after a successful send
-    print(f"sent: '{slug}'")
+    state.save_state(state_path, slug=slug, date_iso=dev.date_iso)
+    print(f"sent: '{slug}' ({dev.date_iso})")
     return "sent"
 
 
