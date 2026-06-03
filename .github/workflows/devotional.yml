@@ -2,9 +2,10 @@ name: Daily Devotional
 
 on:
   schedule:
-    # Every 30 min across the EAT morning window (UTC; EAT = UTC+3).
-    # 21:00-06:59 UTC == 00:00-09:59 EAT.
-    - cron: "*/30 0-6,21-23 * * *"
+    # Every 30 min from publish through the afternoon (UTC; EAT = UTC+3), so we
+    # catch the devotional at earliest publishing AND its artwork whenever it's
+    # uploaded later in the day. 21:00-15:59 UTC == 00:00-18:59 EAT.
+    - cron: "*/30 0-15,21-23 * * *"
   workflow_dispatch: {}
 
 # Prevent overlapping runs from racing on the state commit.

@@ -34,22 +34,20 @@ def chunk_text(text: str, limit: int = SAFE_CHUNK) -> list[str]:
     return chunks or [""]
 
 
-def build_messages(dev) -> tuple[str, list[str], str]:
-    """Return (photo_caption, body_chunks, link_message), all HTML-formatted."""
-    caption = f"<b>{escape_html(dev.title)}</b>"
+def build_messages(dev) -> tuple[str, list[str]]:
+    """Return (header_text, body_chunks), all HTML-formatted."""
+    header = f"<b>{escape_html(dev.title)}</b>"
     if dev.date:
-        caption += f"\n📅 {escape_html(dev.date)}"
+        header += f"\n📅 {escape_html(dev.date)}"
     if dev.author:
-        caption += f"\n<i>{escape_html(dev.author)}</i>"
+        header += f"\n<i>{escape_html(dev.author)}</i>"
 
     parts = []
     if dev.scripture:
         parts.append(f"<b>{escape_html(dev.scripture)}</b>")
     parts.extend(escape_html(p) for p in dev.body)
     body_chunks = chunk_text("\n\n".join(parts))
-
-    link = f'📖 <a href="{dev.url}">Read on phaneroo.org</a>'
-    return caption, body_chunks, link
+    return header, body_chunks
 
 
 def _post(token: str, method: str, payload: dict) -> None:
@@ -72,11 +70,20 @@ def send_photo(token: str, chat_id: str, photo_url: str, caption: str) -> None:
 
 
 def send_devotional(dev, *, token: str, chat_id: str) -> None:
-    caption, body_chunks, link = build_messages(dev)
-    if dev.image_url:
-        send_photo(token, chat_id, dev.image_url, caption)
-    else:
-        send_message(token, chat_id, caption)
+    """Send the devotional as text only — no image (placeholder), no external link.
+
+    The dedicated artwork image is delivered separately via send_artwork() once
+    Phaneroo replaces the placeholder with the devotional's real artwork.
+    """
+    header, body_chunks = build_messages(dev)
+    send_message(token, chat_id, header)
     for chunk in body_chunks:
         send_message(token, chat_id, chunk)
-    send_message(token, chat_id, link)
+
+
+def send_artwork(dev, *, token: str, chat_id: str) -> None:
+    """Send the devotional's artwork image, captioned with its name (no emoji)."""
+    if not dev.image_url:
+        return
+    caption = f"<b>{escape_html(dev.title)}</b>"
+    send_photo(token, chat_id, dev.image_url, caption)

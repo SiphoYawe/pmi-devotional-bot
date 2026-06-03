@@ -33,38 +33,55 @@ def test_build_messages_structure():
         body=["First para.", "GOLDEN NUGGET: x", "PRAYER: y"],
         image_url="https://img.test/x.png", date="1 June 2026", date_iso="2026-06-01",
     )
-    caption, body_chunks, link = telegram.build_messages(dev)
-    assert "<b>My &lt;Title&gt;</b>" in caption           # title escaped + bold
-    assert "1 June 2026" in caption                        # date shown
-    assert "Apostle Grace Lubega" in caption
+    header, body_chunks = telegram.build_messages(dev)
+    assert "<b>My &lt;Title&gt;</b>" in header             # title escaped + bold
+    assert "1 June 2026" in header                         # date shown
+    assert "Apostle Grace Lubega" in header
     assert "<b>John 3:16" in body_chunks[0]                 # scripture bold, first
     assert "First para." in "".join(body_chunks)
-    assert 'href="https://phaneroo.org/devotion/s/"' in link
 
 
 @patch("phaneroo_bot.telegram.requests.post")
-def test_send_devotional_with_image_sends_photo_then_text(mock_post):
+def test_send_devotional_is_text_only_never_photo(mock_post):
+    # First send is text only: no photo (placeholder is skipped) and no link.
     mock_post.return_value.raise_for_status = lambda: None
     mock_post.return_value.json.return_value = {"ok": True}
     dev = Devotional(
         slug="s", url="https://phaneroo.org/devotion/s/", title="T",
-        author="A", scripture="John 3:16", body=["Body."], image_url="https://img/x.png",
-    )
-    telegram.send_devotional(dev, token="TOK", chat_id="42")
-    called = [c.args[0] for c in mock_post.call_args_list]
-    assert any("sendPhoto" in u for u in called)
-    assert any("sendMessage" in u for u in called)
-
-
-@patch("phaneroo_bot.telegram.requests.post")
-def test_send_devotional_without_image_uses_text_header(mock_post):
-    mock_post.return_value.raise_for_status = lambda: None
-    mock_post.return_value.json.return_value = {"ok": True}
-    dev = Devotional(
-        slug="s", url="https://phaneroo.org/devotion/s/", title="T",
-        author="A", scripture="John 3:16", body=["Body."], image_url=None,
+        author="A", scripture="John 3:16", body=["Body."],
+        image_url="https://img/x.png",  # even with an image present, don't send it
     )
     telegram.send_devotional(dev, token="TOK", chat_id="42")
     called = [c.args[0] for c in mock_post.call_args_list]
     assert not any("sendPhoto" in u for u in called)
     assert any("sendMessage" in u for u in called)
+
+
+@patch("phaneroo_bot.telegram.requests.post")
+def test_send_artwork_sends_photo_captioned_with_name(mock_post):
+    mock_post.return_value.raise_for_status = lambda: None
+    mock_post.return_value.json.return_value = {"ok": True}
+    dev = Devotional(
+        slug="s", url="https://phaneroo.org/devotion/s/", title="My <Title>",
+        body=["Body."], image_url="https://img/03-June-2026_Web.png",
+        date="3 June 2026", date_iso="2026-06-03",
+    )
+    telegram.send_artwork(dev, token="TOK", chat_id="42")
+    called = [c.args[0] for c in mock_post.call_args_list]
+    assert any("sendPhoto" in u for u in called)
+    assert not any("sendMessage" in u for u in called)
+    # Caption is the devotional name (escaped), no emoji.
+    photo_call = next(c for c in mock_post.call_args_list if "sendPhoto" in c.args[0])
+    caption = photo_call.kwargs["data"]["caption"]
+    assert "My &lt;Title&gt;" in caption
+    assert "📅" not in caption and "🎨" not in caption
+
+
+@patch("phaneroo_bot.telegram.requests.post")
+def test_send_artwork_noop_without_image(mock_post):
+    dev = Devotional(
+        slug="s", url="https://phaneroo.org/devotion/s/", title="T",
+        body=["Body."], image_url=None,
+    )
+    telegram.send_artwork(dev, token="TOK", chat_id="42")
+    mock_post.assert_not_called()

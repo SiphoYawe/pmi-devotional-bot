@@ -18,11 +18,14 @@ def load_state(path: Path = DEFAULT_PATH) -> dict:
         return {}
 
 
-def save_state(path: Path, *, slug: str, date_iso: str | None = None) -> None:
+def save_state(
+    path: Path, *, slug: str, date_iso: str | None = None, artwork_sent: bool = False
+) -> None:
     path = Path(path)
     data = {
         "last_slug": slug,
         "last_date": date_iso,
+        "artwork_sent": artwork_sent,
         "last_sent_at": datetime.now(timezone.utc).isoformat(),
     }
     path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")

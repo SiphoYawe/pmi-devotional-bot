@@ -28,6 +28,20 @@ def test_save_allows_missing_date(tmp_path):
     assert state.load_state(path)["last_date"] is None
 
 
+def test_save_tracks_artwork_sent(tmp_path):
+    path = tmp_path / "state.json"
+    state.save_state(path, slug="x", date_iso=None, artwork_sent=False)
+    assert state.load_state(path)["artwork_sent"] is False
+    state.save_state(path, slug="x", date_iso="2026-06-03", artwork_sent=True)
+    assert state.load_state(path)["artwork_sent"] is True
+
+
+def test_artwork_sent_defaults_false(tmp_path):
+    path = tmp_path / "state.json"
+    state.save_state(path, slug="x", date_iso="2026-06-03")
+    assert state.load_state(path)["artwork_sent"] is False
+
+
 def test_load_handles_corrupt_file(tmp_path):
     path = tmp_path / "state.json"
     path.write_text("not json{")
