@@ -1,4 +1,5 @@
 """HTTP layer: GET text/JSON with retries, timeout, and a real User-Agent."""
+import json
 import time
 import requests
 
@@ -30,4 +31,13 @@ def get_text(url: str, *, timeout: int = DEFAULT_TIMEOUT, retries: int = 3) -> s
 
 
 def get_json(url: str, *, timeout: int = DEFAULT_TIMEOUT, retries: int = 3) -> dict:
-    return _get(url, timeout=timeout, retries=retries).json()
+    resp = _get(url, timeout=timeout, retries=retries)
+    try:
+        return resp.json()
+    except ValueError:
+        # The oEmbed endpoint intermittently appends output (cache footers,
+        # plugin notices) after the JSON body, which trips strict parsing with
+        # "Extra data". Decode the leading value and drop the trailing junk; a
+        # body that is not JSON at all still raises.
+        data, _ = json.JSONDecoder().raw_decode(resp.text.lstrip("﻿ \t\r\n"))
+        return data

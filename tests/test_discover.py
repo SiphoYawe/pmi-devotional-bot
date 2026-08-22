@@ -6,22 +6,35 @@ def test_find_latest_from_fixture(fixture_text):
     html = fixture_text("daily_devotion.html")
     slug, url = discover.find_latest(html)
     assert slug  # non-empty
-    assert url == f"https://phaneroo.org/devotion/{slug}/"
-    assert "/devotion/" in url
+    assert url == f"https://phaneroo.org/daily_devotion/{slug}/"
 
 
 def test_find_latest_picks_first_devotion_link():
     html = """
     <html><body>
       <a href="https://phaneroo.org/daily-devotion/">All</a>
-      <a href="https://phaneroo.org/devotion/first-one/">First</a>
-      <a href="https://phaneroo.org/devotion/second-one/">Second</a>
-      <a href="https://phaneroo.org/devotion/#respond">Comment</a>
+      <a href="https://phaneroo.org/daily_devotion/first-one/">First</a>
+      <a href="https://phaneroo.org/daily_devotion/second-one/">Second</a>
+      <a href="https://phaneroo.org/daily_devotion/#respond">Comment</a>
     </body></html>
     """
     slug, url = discover.find_latest(html)
     assert slug == "first-one"
-    assert url == "https://phaneroo.org/devotion/first-one/"
+    assert url == "https://phaneroo.org/daily_devotion/first-one/"
+
+
+def test_find_latest_accepts_legacy_devotion_base():
+    """Pre-2026-08-20 permalinks (/devotion/<slug>/) still resolve via 301."""
+    html = '<a href="https://phaneroo.org/devotion/older-style/">x</a>'
+    slug, url = discover.find_latest(html)
+    assert slug == "older-style"
+    assert url == "https://phaneroo.org/devotion/older-style/"
+
+
+def test_find_latest_ignores_the_listing_page_itself():
+    """/daily-devotion/ (hyphen) is the index, not a devotional."""
+    with pytest.raises(discover.NoDevotionalFound):
+        discover.find_latest('<a href="https://phaneroo.org/daily-devotion/">All</a>')
 
 
 def test_find_latest_raises_when_none_found():
@@ -34,7 +47,7 @@ def test_discover_applies_cache_busting():
 
     def fake_fetch(url):
         seen["url"] = url
-        return '<a href="https://phaneroo.org/devotion/today/">x</a>'
+        return '<a href="https://phaneroo.org/daily_devotion/today/">x</a>'
 
     slug, url = discover.discover(fetch_text=fake_fetch)
     assert slug == "today"
@@ -49,7 +62,7 @@ def test_discover_falls_back_to_homepage():
         calls.append(url)
         if "daily-devotion" in url:
             return "<html>no devotion links here</html>"
-        return '<a href="https://phaneroo.org/devotion/from-home/">x</a>'
+        return '<a href="https://phaneroo.org/daily_devotion/from-home/">x</a>'
 
     slug, url = discover.discover(fetch_text=fake_fetch)
     assert slug == "from-home"

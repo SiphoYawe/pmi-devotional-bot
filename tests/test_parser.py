@@ -40,6 +40,23 @@ def test_date_from_image_url_underscore_format():
     assert iso == "2026-05-21"
 
 
+def test_date_from_image_url_abbreviated_month():
+    """Phaneroo mixes full and abbreviated month names in artwork filenames."""
+    display, iso = parser.date_from_image_url(
+        "https://phaneroo.org/wp-content/uploads/2026/08/18_Aug_2026_Web.jpg"
+    )
+    assert display == "18 August 2026"
+    assert iso == "2026-08-18"
+
+
+def test_date_from_image_url_abbreviated_september():
+    display, iso = parser.date_from_image_url(
+        "https://phaneroo.org/wp-content/uploads/2026/09/02-Sept-2026_Web.png"
+    )
+    assert display == "2 September 2026"
+    assert iso == "2026-09-02"
+
+
 def test_date_from_image_url_unparseable_is_none():
     assert parser.date_from_image_url("https://x/logo.png") == (None, None)
     assert parser.date_from_image_url(None) == (None, None)

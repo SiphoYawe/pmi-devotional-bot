@@ -26,6 +26,33 @@ def test_get_json_returns_dict(mock_get):
     assert fetcher.get_json("https://x.test") == {"title": "T"}
 
 
+@patch("phaneroo_bot.fetcher.requests.get")
+def test_get_json_tolerates_trailing_junk(mock_get):
+    """The WP oEmbed endpoint intermittently appends output after the JSON body."""
+    import requests as r
+    resp = _resp(text='{"title": "T", "thumbnail_url": "https://x/i.png"}<!-- cached -->')
+    resp.json.side_effect = r.exceptions.JSONDecodeError(
+        "Extra data", resp.text, 49
+    )
+    mock_get.return_value = resp
+    assert fetcher.get_json("https://x.test") == {
+        "title": "T",
+        "thumbnail_url": "https://x/i.png",
+    }
+
+
+@patch("phaneroo_bot.fetcher.requests.get")
+def test_get_json_raises_when_body_is_not_json_at_all(mock_get):
+    import requests as r
+    resp = _resp(text="<html>blocked</html>")
+    resp.json.side_effect = r.exceptions.JSONDecodeError(
+        "Expecting value", resp.text, 0
+    )
+    mock_get.return_value = resp
+    with pytest.raises(ValueError):
+        fetcher.get_json("https://x.test")
+
+
 @patch("phaneroo_bot.fetcher.time.sleep", lambda *_: None)
 @patch("phaneroo_bot.fetcher.requests.get")
 def test_get_text_retries_then_succeeds(mock_get):

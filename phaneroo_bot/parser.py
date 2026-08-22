@@ -17,14 +17,16 @@ _SEPARATORS = {"", "—", "–", "-", "."}
 
 # Devotional thumbnails are named like "01-June-2026_Web.png" / "21_May_2026_Web.jpg".
 _IMG_DATE_RE = re.compile(r"(\d{1,2})[-_]([A-Za-z]+)[-_](\d{4})")
-_MONTHS = {
-    m.lower(): i
-    for i, m in enumerate(
-        ["January", "February", "March", "April", "May", "June",
-         "July", "August", "September", "October", "November", "December"],
-        start=1,
-    )
-}
+_MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
+# Filenames mix full and abbreviated month names ("18_Aug_2026_Web.jpg"), so
+# accept both — an unrecognised month reads as "artwork not up yet" and the
+# devotional's image is never sent.
+_MONTHS = {name.lower(): i for i, name in enumerate(_MONTH_NAMES, start=1)}
+_MONTHS.update({name[:3].lower(): i for i, name in enumerate(_MONTH_NAMES, start=1)})
+_MONTHS["sept"] = 9
 
 
 @dataclass
@@ -55,7 +57,7 @@ def date_from_image_url(image_url: str | None) -> tuple[str | None, str | None]:
         d = date(int(year), month, int(day))
     except ValueError:
         return None, None
-    return f"{d.day} {month_name.title()} {d.year}", d.isoformat()
+    return f"{d.day} {_MONTH_NAMES[d.month - 1]} {d.year}", d.isoformat()
 
 
 def extract_metadata(oembed_json: dict) -> tuple[str, str | None]:

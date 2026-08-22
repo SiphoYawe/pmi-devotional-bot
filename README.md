@@ -68,3 +68,23 @@ minutes under load.
 - The parser targets the page's first language tab (English). If Phaneroo changes the page
   markup, `tests/test_parser.py` (run against `tests/fixtures/`) will catch it — refresh
   the fixtures and adjust selectors.
+
+### Site changes on 2026-08-20
+
+Phaneroo reworked the site on 2026-08-20, which broke the bot for two days. Two things
+changed, both worth knowing about:
+
+1. **Permalinks moved** from `https://phaneroo.org/devotion/<slug>/` to
+   `https://phaneroo.org/daily_devotion/<slug>/` (underscore). `discover.py` now matches
+   either base, so a flip back will not take the bot down. Old-style URLs still 301 to the
+   new ones.
+2. **Dated artwork stopped appearing.** Every devotional since 2026-08-20 carries the same
+   generic featured image (`Devotion_web-thumb_sq-600x600.jpg`) instead of a dated file
+   like `19-August-2026_Web.png`. Because a parseable date in the filename is what signals
+   "real artwork is up", the artwork phase no longer fires: the bot sends the text and then
+   no-ops for the rest of the day. Text delivery is unaffected and each new devotional is
+   still picked up. If Phaneroo resumes dated artwork, the existing logic resumes with it.
+
+A side effect of (2) is that `last_date` stays `null`, so the older-than-last-sent accuracy
+guard is currently inert. Restoring it would need a date source other than the image
+filename.

@@ -11,8 +11,14 @@ from phaneroo_bot import fetcher
 
 LISTING_URL = "https://phaneroo.org/daily-devotion/"
 HOMEPAGE_URL = "https://phaneroo.org/"
-# https://phaneroo.org/devotion/<slug>/  (slug = lowercase letters/digits/hyphens)
-_DEVOTION_RE = re.compile(r"^https://phaneroo\.org/devotion/([a-z0-9-]+)/$")
+# https://phaneroo.org/<base>/<slug>/  (slug = lowercase letters/digits/hyphens).
+# The permalink base changed from "devotion" to "daily_devotion" on 2026-08-20;
+# both are accepted because the old form still 301s to the new one, and matching
+# either means a future flip back does not take the bot down. Note the listing
+# itself lives at /daily-devotion/ (hyphen) and correctly matches neither.
+_DEVOTION_RE = re.compile(
+    r"^https://phaneroo\.org/(daily_devotion|devotion)/([a-z0-9-]+)/$"
+)
 
 
 class NoDevotionalFound(Exception):
@@ -31,9 +37,9 @@ def find_latest(listing_html: str) -> tuple[str, str]:
     for a in soup.find_all("a", href=True):
         m = _DEVOTION_RE.match(a["href"].strip())
         if m:
-            slug = m.group(1)
-            return slug, f"https://phaneroo.org/devotion/{slug}/"
-    raise NoDevotionalFound("No /devotion/<slug>/ link found")
+            base, slug = m.group(1), m.group(2)
+            return slug, f"https://phaneroo.org/{base}/{slug}/"
+    raise NoDevotionalFound("No /daily_devotion/<slug>/ link found")
 
 
 def discover(fetch_text=fetcher.get_text) -> tuple[str, str]:
